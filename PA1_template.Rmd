@@ -1,25 +1,91 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Peer assignment 1-Reproducibile Research"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+## Load data
 
+First I load the data and process it.
 
+```{r }
+data <- read.csv("activity.csv")
+library(dplyr)
+library(ggplot2)
+data %>% group_by(date) %>% summarize(stepsperday = sum(steps))
+```
 
-## What is mean total number of steps taken per day?
+## What is the mean total number of steps taken per day?
 
+What is mean total number of steps taken per day? For this part, ignoring the missing value, I calculate the total number of steps taken per day and then put it into a histogram. After this exploratory phase, I calculated the mean and median of the total number of steps taken per day.
 
+```{r}
+data %>% group_by(date) %>% summarize(stepsperday = sum(steps)) %>% ggplot(aes(x = stepsperday)) + geom_histogram(bins = 20) + ggtitle("Total number of steps per day") + xlab("Steps per day")
+
+mean(data$steps, na.rm= TRUE)
+median(data$steps, na.rm = TRUE)
+
+m1 <- with(data, tapply(steps, date, mean, na.rm = TRUE))
+m2 <- with(data, tapply(steps, date, median, na.rm = TRUE))
+d1 <- data.frame(date = names(m1), mean = m1)
+d2 <- data.frame(date= names(m2), median = m2)
+par(mfcol = c(1, 2))
+with(d1, plot(date, mean, main = "Mean steps per day", xlab = "Time", ylab = "Mean"))
+with(d2, plot(date, median, main = "Median steps per day", xlab = "Time", ylab = "Median"))
+```
 
 ## What is the average daily activity pattern?
 
+I create a time series plot of the 5-minute interval and the average number of steps taken, averaged across all days. I calculated which 5-min interval contains the max number of steps.
 
+```{r}
+averageAct <- aggregate(data$steps, by = list(data$interval), FUN = mean, na.rm = TRUE)
+names(averageAct) <- c("interval", "average")
+
+plot(averageAct$interval, averageAct$average, type = "l", col = "steelblue", lwd = 2, xlab = "Intervals", ylab = "Average n of steps")
+
+max <- max(data$steps, na.rm = TRUE)
+max
+```
 
 ## Imputing missing values
 
+In this part I've imputed the missing values, assigning to them the values of the mean per interval. After imputing, I've created a histogram of the total number of steps taken each day.
+
+```{r}
+NAs <- is.na(data$steps)
+table(NAs)
+
+data2 <- averageAct$average[match(data$interval, averageAct$interval)]
+imputed <- transform(data, steps = ifelse(is.na(data$steps), yes = data2, no = data$steps))
+total_imputed <- aggregate(steps ~ date, imputed, sum)
+
+hist(total_imputed$steps, xlab = "Total steps per day", main = "Total number of steps taken each day", breaks = 10, col = "steelblue", ylim = c(0, 30))
+
+mean_NoNA <- mean(total_imputed$steps)
+mean_NoNA
+
+median_NoNA <- median(total_imputed$steps)
+median_NoNA
+```
+
+## Are there differences in activity patterns between weekdays and weekend?
+
+I've created a plot containing a time series of the 5-min interval and the average number of steps taken, divided by weekdays and weekends
+
+```{r}
+data$date <- as.Date(strptime(data$date, format = "%Y-%m-%d"))
+data$datetype <- sapply(data$date, function (x){
+    if (weekdays(x) == "sabato" | weekdays(x) == "domenica"){
+        y <- "Weekend"} else {
+            y <- "Weekday"}
+    y
+})
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+data3 <- aggregate(steps ~ interval + datetype, data, mean, na.rm = TRUE)
+ggplot(data3, aes(x=interval, y=steps, color=datetype)) + geom_line() + facet_wrap(~datetype, ncol = 1, nrow= 2) + labs(title = "Average daily steps by type of date", x= "Interval", y= "Average number of steps")
+```
